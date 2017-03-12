@@ -105,8 +105,8 @@ namespace Detector
                     sender.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, 10000);
                     // Receive the response from the remote device.  
                     int bytesRec = sender.Receive(bytes);
-                    result = Encoding.ASCII.GetString(bytes, 0, bytesRec);
-                    Logging.logMessage("Echoed test = {0}", result);  
+                    result = Encoding.UTF8.GetString(bytes, 0, bytesRec);
+                    Logging.logMessage("Remote ADB response:", result);  
   
                     // Release the socket.  
                     sender.Shutdown(SocketShutdown.Both);  
