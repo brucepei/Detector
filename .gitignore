@@ -1,5 +1,6 @@
 *.sqlite3 
-*.pyc 
+*.pyc
+*.suo
 bin
 obj
 _eric6project
