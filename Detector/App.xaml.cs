@@ -12,10 +12,17 @@ namespace Detector
     /// </summary>
     public partial class App : Application
     {
-        private static DeviceManage dm = new DeviceManage();
+        static App()
+        {
+            Logging.Initialize(true, true);
+            dm = new DeviceManage();
+        }
+
+        private static DeviceManage dm;
         public static DeviceManage DM
         {
             get { return dm; }
         }
+        
     }
 }

@@ -5,10 +5,12 @@ using System.Text;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Windows.Threading;
-
+using System.Threading.Tasks;
 
 namespace Detector
 {
+    
+    public delegate void RefreshDevicesDoneHandle();
     public class DeviceManage
     {
         public DeviceManage()
@@ -20,9 +22,23 @@ namespace Detector
                 {
                     new Device("CBD Server", DeviceType.IP, "cbd"),
                 };
+                for (int i=1; i < 10; i++)
+                {
+                    deviceList.Add(new Device("CBD Server" + i, DeviceType.IP, "128.0.0." + i));
+                }
                 Console.WriteLine("Cannot load data!");
             }
-            int maxId = 0;
+            else
+            {
+                Device.AutoId = MaxDeviceId() + 1;
+            }
+            deviceList.CollectionChanged += OnDeviceListChanged;
+        }
+
+        public MainWindow UI;
+        public Int32 MaxDeviceId()
+        {
+            Int32 maxId = 0;
             foreach (var d in deviceList)
             {
                 if (d.Id > maxId)
@@ -30,13 +46,8 @@ namespace Detector
                     maxId = d.Id;
                 }
             }
-            Device.AutoId = maxId + 1;
-            deviceList.CollectionChanged += OnDeviceListChanged;
-        }
-
-        public void SaveData(Object sender, EventArgs e)
-        {
-            Logging.logMessage("device saved!");
+            Logging.logMessage(String.Format("Get maximum device id={0}!", maxId));
+            return maxId;
         }
 
         public void OnDeviceListChanged(Object sender, NotifyCollectionChangedEventArgs e)
@@ -57,7 +68,6 @@ namespace Detector
             }
         }
 
-
         private ObservableCollection<Device> deviceList;
         public ObservableCollection<Device> DeviceList
         {
@@ -71,5 +81,45 @@ namespace Detector
             }
         }
 
+        public void SaveDevices()
+        {
+            var t = DB.SaveDataAsync();
+            t.ContinueWith(task => Logging.logMessage(String.Format("DB saved: {0}!", task.Result)), TaskContinuationOptions.OnlyOnRanToCompletion);
+            t.ContinueWith(task => Logging.logMessage(String.Format("DB saved exception: {0}!", task.Exception)), TaskContinuationOptions.OnlyOnFaulted);
+        }
+
+        public void DoneRefreshDevices(List<Int32> doneList, Device device, Int32 max)
+        {
+            doneList.Add(device.Id);
+            if (doneList.Count >= max)
+            {
+                Logging.logMessage("Finished refresh all devices!");
+                UI.Dispatcher.BeginInvoke(UI.RepeatRefreshDevicesHandle);
+            }
+        }
+
+        public void RefreshDevices()
+        {
+            UI = App.Current.MainWindow as MainWindow;
+            var doneList = new List<Int32>();
+            var totalDevices = deviceList.Count;
+            for (Int32 i = 0; i < totalDevices; i++)
+            {
+                var device = deviceList[i];
+                if (device.Type == DeviceType.IP)
+                {
+                    var t = Detect.PingAsync(device.IP, device);
+                    t.ContinueWith(task => DoneRefreshDevices(doneList, device, totalDevices));
+                }
+                else if (device.Type == DeviceType.ADB_IP)
+                {
+                    var t = Detect.PingRemoteADBAsync(device.IP, device.ADB, device);
+                    t.ContinueWith(task => DoneRefreshDevices(doneList, device, totalDevices));
+                }
+                Logging.logMessage(String.Format("Start to ping device {0} of id {1}", device.IP, i));
+                device.Status = DeviceStatus.None;
+                device.Info = "In query";
+            }
+        }
     }
 }

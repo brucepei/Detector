@@ -10,29 +10,33 @@
     using System.IO;
 
     public delegate void UpdateLogDelegate(String msg, Color color);
-    public class LogWindow : Window
+    public abstract class LogWindow : Window
     {
-        public RichTextBox m_logBox;
-        public UpdateLogDelegate updateLogDelegate;
+        public abstract RichTextBox LogBox
+        {
+            get;
+        }
+
+        public UpdateLogDelegate UpdateLogBox;
         public LogWindow()
         {
-            updateLogDelegate = new UpdateLogDelegate(toLogBox);
+            UpdateLogBox = new UpdateLogDelegate(toLogBox);
         }
 
         public void toLogBox(String msg, Color color)
         {
-            if (m_logBox != null)
+            if (LogBox != null)
             {
-                bool focused = m_logBox.IsFocused;
+                bool focused = LogBox.IsFocused;
                 if (!focused)
                 {
-                    m_logBox.Focus();
+                    LogBox.Focus();
                 }
                 var para = new Paragraph { Margin = new Thickness(0) };
-                m_logBox.Document.Blocks.Add(para);
+                LogBox.Document.Blocks.Add(para);
                 Run run = new Run() { Text = msg, Foreground = new SolidColorBrush(color) };
                 para.Inlines.Add(run);
-                m_logBox.ScrollToEnd();
+                LogBox.ScrollToEnd();
             }
         }
     }
@@ -44,6 +48,12 @@
             if (ex.InnerException == null) return ex;
 
             return ex.InnerException.GetOriginalException();
+        }
+
+        public static String GetOriginalMessage(this Exception ex)
+        {
+            var orig = ex.GetOriginalException();
+            return String.Format("{0} threw {1}: {2}", orig.TargetSite.Name, orig.GetType().ToString(), orig.Message);
         }
     }
 
@@ -79,20 +89,41 @@
         [DllImport("kernel32.dll")]
         private static extern void SetStdHandle(UInt32 nStdHandle, IntPtr handle);
 
-        public static void Initialize(LogWindow targetWindow, RichTextBox logBox)
+        public static void Initialize(Boolean openConsole, Boolean resetStdout)
+        {
+            if (openConsole)
+            {
+                AllocConsole();
+            }
+            else
+            {
+                AttachConsole(-1);
+            }
+            if (resetStdout)
+            {
+                // stdout's handle seems to always be equal to 7
+                IntPtr defaultStdout = new IntPtr(7);
+                IntPtr currentStdout = GetStdHandle(StdOutputHandle);
+                if (currentStdout != defaultStdout)
+                    SetStdHandle(StdOutputHandle, defaultStdout);
+                TextWriter writer = new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true };
+                Console.SetOut(writer);
+            }
+        }
+
+        public static void Initialize(LogWindow targetWindow)
         {
             ui = targetWindow;
-            ui.m_logBox = logBox;
-            ui.m_logBox.Document.Blocks.Clear();
-            //AllocConsole();
-            AttachConsole(-1);
-            // stdout's handle seems to always be equal to 7
-            IntPtr defaultStdout = new IntPtr(7);
-            IntPtr currentStdout = GetStdHandle(StdOutputHandle);
-            if (currentStdout != defaultStdout)
-                SetStdHandle(StdOutputHandle, defaultStdout);
-            TextWriter writer = new StreamWriter(Console.OpenStandardOutput()) { AutoFlush = true };
-            Console.SetOut(writer);
+            if (ui != null)
+            {
+                ui.LogBox.Document.Blocks.Clear();
+            }
+        }
+
+        public static void Initialize(LogWindow targetWindow, Boolean openConsole, Boolean resetStdout)
+        {
+            Initialize(targetWindow);
+            Initialize(openConsole, resetStdout);
         }
 
         private static void log(string msg, LogType type = LogType.INFO)
@@ -124,8 +155,8 @@
                 }
                 try
                 {
-                    ui.Dispatcher.Invoke(ui.updateLogDelegate, objArray);
-                    //ui.Dispatcher.BeginInvoke(ui.updateLogDelegate, objArray);
+                    ui.Dispatcher.Invoke(ui.UpdateLogBox, objArray);
+                    //ui.Dispatcher.BeginInvoke(ui.UpdateLogBox, objArray);
                 }
                 catch (Exception exception)
                 {

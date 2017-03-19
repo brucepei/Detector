@@ -162,5 +162,11 @@ namespace Detector
                 }
             }
         }
+
+        public void UpdateStatus(ErrorCode e, String msg=null)
+        {
+            Status = e == ErrorCode.NoError ? DeviceStatus.PASS : DeviceStatus.FAIL; //use "Status/Info" to trigger property changed event
+            Info = msg == null ? String.Empty : msg;
+        }
     }
 }

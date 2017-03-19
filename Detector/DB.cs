@@ -109,6 +109,7 @@ namespace Detector
                     System.IO.StreamWriter file = new System.IO.StreamWriter(_dbFileName, false);
                     file.Write(json);
                     file.Close();
+                    result = true;
                 }
                 catch (Exception ex)
                 {

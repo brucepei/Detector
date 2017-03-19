@@ -20,8 +20,10 @@
             </Menu>
             <Border DockPanel.Dock="Top" Padding="3">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Refresh remains: 10" VerticalAlignment="Center" Margin="3, 0, 3, 0" />
-                    <Button Content="Start Refresh" Margin="3, 0, 3, 0" Click="StartRefreshButton_Click" />
+                    <TextBlock Text="Refresh remains:" VerticalAlignment="Center" Margin="3, 0, 3, 0" />
+                    <TextBlock Text="" VerticalAlignment="Center" Margin="3, 0, 3, 0" Name="remainTextBlock" />
+                    <Button Content="Start Refresh" Margin="3, 0, 3, 0" Click="StartRefreshButton_Click" Name="startRefreshBtn" />
+                    <Button Content="Cancel Refresh" Margin="3, 0, 3, 0" Click="CancelRefreshButton_Click" Name="cancelRefreshBtn" IsEnabled="False" />
                     <Button Content="Save Device" Margin="3, 0, 3, 0" Click="SaveDeviceButton_Click" />
                 </StackPanel>
             </Border>

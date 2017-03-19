@@ -9,22 +9,49 @@ using System.Net.Sockets;
 
 namespace Detector
 {
+    public enum ErrorCode
+    {
+        NoError = 0x0000,
+        PingFailError,
+        PingExceptionError,
+        RemoteADBFailError,
+        RemoteADBExceptionError,
+    }
+
     class Detect
     {
         public static Int32 ASPort = 16789;
 
         public static Task<Boolean> PingAsync(String targetIp)
         {
-            var t = new Task<Boolean> (ip => Ping((String)ip), targetIp);
+            var t = new Task<Boolean> (ip => Ping((String)ip, 3000), targetIp);
             t.Start();
             return t;
         }
 
-        public static Boolean Ping(String ip)
+        public static Task<Boolean> PingAsync(String targetIp, Device device)
+        {
+            var t = PingAsync(targetIp);
+            t.ContinueWith(task =>
+            {
+                if (task.Result)
+                {
+                    device.UpdateStatus(ErrorCode.NoError, "Ping ok");
+                }
+                else
+                {
+                    device.UpdateStatus(ErrorCode.PingFailError, "Ping failed");
+                }
+            }, TaskContinuationOptions.OnlyOnRanToCompletion);
+            t.ContinueWith(task => device.UpdateStatus(ErrorCode.PingExceptionError, task.Exception.GetOriginalMessage()), TaskContinuationOptions.OnlyOnFaulted);
+            return t;
+        }
+
+        public static Boolean Ping(String ip, Int32 timeout)
         {
             bool online = false;
             Ping ping = new Ping();
-            PingReply pingReply = ping.Send(ip);
+            PingReply pingReply = ping.Send(ip, timeout);
             if (pingReply.Status == IPStatus.Success)
             {
                 online = true;
@@ -55,6 +82,24 @@ namespace Detector
             return t;
         }
 
+        public static Task<Boolean> PingRemoteADBAsync(String asIP, String sn, Device device)
+        {
+            var t = PingRemoteADBAsync(asIP, sn);
+            t.ContinueWith(task =>
+            {
+                if (task.Result)
+                {
+                    device.UpdateStatus(ErrorCode.NoError, "Ping remote ADB ok");
+                }
+                else
+                {
+                    device.UpdateStatus(ErrorCode.RemoteADBFailError, "Ping remote ADB failed");
+                }
+            }, TaskContinuationOptions.OnlyOnRanToCompletion);
+            t.ContinueWith(task => device.UpdateStatus(ErrorCode.RemoteADBExceptionError, task.Exception.GetOriginalMessage()), TaskContinuationOptions.OnlyOnFaulted);
+            return t;
+        }
+
         public static Boolean PingRemouteADB(String asIP, String sn)
         {
             var result = false;
@@ -70,64 +115,48 @@ namespace Detector
         public static String ConnectRemouteADB(String asIP, Int32 asPort, String sn, String cmd)
         {
             String result = String.Empty;
-            byte[] bytes = new byte[4096];  
-            // Connect to a remote device.  
-            try {
-                IPAddress ipAddress = null;
-                foreach (var addr in Dns.GetHostEntry(asIP).AddressList)
+            byte[] bytes = new byte[4096];
+            // Connect to a remote device
+            IPAddress ipAddress = null;
+
+            foreach (var addr in Dns.GetHostEntry(asIP).AddressList)
+            {
+                if (addr.AddressFamily == AddressFamily.InterNetwork)
                 {
-                    if (addr.AddressFamily == AddressFamily.InterNetwork)
-                    {
-                        ipAddress = addr;
-                        break;
-                    }
+                    ipAddress = addr;
+                    break;
                 }
-                if (ipAddress == null)
-                {
-                    Logging.logMessage("Cannot resolve ip:", asIP);
-                    return result;
-                }
-                IPEndPoint remoteEP = new IPEndPoint(ipAddress, asPort);  
-  
-                // Create a TCP/IP  socket.  
-                Socket sender = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp );  
-  
-                // Connect the socket to the remote endpoint. Catch any errors.  
-                try {  
-                    sender.Connect(remoteEP);  
-                    Logging.logMessage("Socket connected to {0}", sender.RemoteEndPoint.ToString());  
-  
-                    // Encode the data string into a byte array.  
-                    byte[] msg = Encoding.ASCII.GetBytes(String.Format("adb -s {0} shell {1}\n", sn, cmd));
-                    // Send the data through the socket.
-                    Logging.logMessage("Send msg:", msg.Length);
-                    int bytesSent = sender.Send(msg);
-                    sender.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, 10000);
-                    // Receive the response from the remote device.  
-                    int bytesRec = sender.Receive(bytes);
-                    result = Encoding.UTF8.GetString(bytes, 0, bytesRec);
-                    Logging.logMessage("Remote ADB response:", result);  
-  
-                    // Release the socket.  
-                    sender.Shutdown(SocketShutdown.Both);  
-                    sender.Close();  
-  
-                } catch (ArgumentNullException ane) {
-                    Logging.logMessage("ArgumentNullException:", ane);  
-                } catch (SocketException se) {
-                    Logging.logMessage("SocketException:", se);  
-                } catch (Exception e) {
-                    Logging.logMessage("Unhandled exception:", e);  
-                }  
-            } catch (Exception e) {
-                Logging.logMessage("Unexpected exception:", e);  
             }
+            if (ipAddress == null)
+            {
+                Logging.logMessage("Cannot resolve ip:", asIP);
+                return result;
+            }
+            IPEndPoint remoteEP = new IPEndPoint(ipAddress, asPort);
+            // Create a TCP/IP  socket.  
+            Socket sender = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp );  
+  
+            // Connect the socket to the remote endpoint. Catch any errors.  
+            sender.Connect(remoteEP);  
+            Logging.logMessage("Socket connected to {0}", sender.RemoteEndPoint.ToString());  
+  
+            // Encode the data string into a byte array.  
+            byte[] msg = Encoding.ASCII.GetBytes(String.Format("adb -s {0} shell {1}\n", sn, cmd));
+            // Send the data through the socket.
+            Logging.logMessage("Send msg:", msg.Length);
+            int bytesSent = sender.Send(msg);
+            sender.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, 10000);
+            // Receive the response from the remote device.  
+            int bytesRec = sender.Receive(bytes);
+            result = Encoding.UTF8.GetString(bytes, 0, bytesRec);
+            Logging.logMessage("Remote ADB response:", result);  
+  
+            // Release the socket.  
+            sender.Shutdown(SocketShutdown.Both);  
+            sender.Close();  
+
             return result;
         }
-
-
-
-
 
     }
 }

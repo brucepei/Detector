@@ -13,6 +13,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using System.Threading.Tasks;
+using System.Windows.Controls.Primitives;
 
 namespace Detector
 {
@@ -24,17 +25,47 @@ namespace Detector
         public MainWindow()
         {
             InitializeComponent();
-            deviceResult = new Dictionary<Int32, Task<Boolean>>();
-            dispatcherTimer = null;
             Loaded += new RoutedEventHandler(OnMainWindow_Loaded);
+            RepeatRefreshDevicesHandle += new RefreshDevicesDoneHandle(RepeatRefreshDevices);
+            RefreshTimeout = 300;
+            RefreshRemains = RefreshTimeout;
+            dispatcherTimer = new DispatcherTimer();
+            dispatcherTimer.Tick += new EventHandler(OnWaitingRefresh);
+            dispatcherTimer.Interval = new TimeSpan(0, 0, 1);
+        }
+        public override RichTextBox LogBox
+        {
+            get { return logBox; }
+        }
+        public DispatcherTimer dispatcherTimer;
+        public Int32 RefreshTimeout;
+        public Int32 RefreshRemains;
+        public RefreshDevicesDoneHandle RepeatRefreshDevicesHandle;
+        public void RepeatRefreshDevices()
+        {
+            cancelRefreshBtn.IsEnabled = true;
+            dispatcherTimer.Start();
         }
 
-        private Dictionary<Int32, Task<Boolean>> deviceResult;
-        private DispatcherTimer dispatcherTimer;
+        public void OnWaitingRefresh(object sender, EventArgs e)
+        {
+            remainTextBlock.Text = RefreshRemains.ToString();
+            if (--RefreshRemains < 0)
+            {
+                cancelRefreshBtn.IsEnabled = false;
+                RefreshRemains = RefreshTimeout;
+                if (dispatcherTimer != null)
+                {
+                    dispatcherTimer.Stop();
+                    Logging.logMessage("Ready to next refresh!");
+                    startRefreshBtn.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                }
+            }
+        }
 
         public void OnMainWindow_Loaded(Object sender, RoutedEventArgs e)
         {
-            Logging.Initialize(this, logBox);
+            Logging.Initialize(this);
             Logging.logMessage("Hello");
 
             grid.DataContext = App.DM.DeviceList;
@@ -49,64 +80,20 @@ namespace Detector
 
         private void SaveDeviceButton_Click(object sender, RoutedEventArgs e)
         {
-            DB.SaveDataAsync();
-        }
-
-        private void OnTimedEvent(object sender, EventArgs e)
-        {
-            var toRemoved = new List<Int32>();
-            foreach (var result in deviceResult)
-            {
-                var index = result.Key;
-                var taskResult = result.Value;
-                if (taskResult != null && taskResult.IsCompleted)
-                {
-                    try
-                    {
-                        Boolean deviceStatus = taskResult.Result;
-                        Logging.logMessage(String.Format("Device {0} status is {1}!", App.DM.DeviceList[index].IP, deviceStatus));
-                        App.DM.DeviceList[index].Status = deviceStatus ? DeviceStatus.PASS : DeviceStatus.FAIL;
-                        App.DM.DeviceList[index].Info = String.Format("Ping result: {0}", deviceStatus);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logging.logMessage(String.Format("Check device {0} with exception:", App.DM.DeviceList[index].IP), ex);
-                        App.DM.DeviceList[index].Status = DeviceStatus.FAIL;
-                        App.DM.DeviceList[index].Info = ex.Message;
-                    }
-                    toRemoved.Add(index);
-                }
-            }
-            foreach (var index in toRemoved)
-            {
-                deviceResult.Remove(index);
-                Logging.logMessage(String.Format("Remove result of id {0}!", index));
-            }
+            App.DM.SaveDevices();
         }
 
         private void StartRefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            dispatcherTimer = new DispatcherTimer();
-            dispatcherTimer.Tick += new EventHandler(OnTimedEvent);
-            dispatcherTimer.Interval = new TimeSpan(0, 0, 1);
-            dispatcherTimer.Start();
-
-            for (Int32 i = 0; i < App.DM.DeviceList.Count; i++ )
-            {
-                var device = App.DM.DeviceList[i];
-                if (device.Type == DeviceType.IP)
-                {
-                    deviceResult[i] = Detect.PingAsync(device.IP);
-                }
-                else if (device.Type == DeviceType.ADB_IP)
-                {
-                    deviceResult[i] = Detect.PingRemoteADBAsync(device.IP, device.ADB);
-                }
-                Logging.logMessage(String.Format("Start to ping device {0} of id {1}", device.IP, i));
-                device.Status = DeviceStatus.None;
-                device.Info = "In query";
-            }
+            App.DM.RefreshDevices();
+            startRefreshBtn.IsEnabled = false;
         }
 
+        private void CancelRefreshButton_Click(object sender, RoutedEventArgs e)
+        {
+            dispatcherTimer.Stop();
+            startRefreshBtn.IsEnabled = true;
+            cancelRefreshBtn.IsEnabled = false;
+        }
     }
 }
