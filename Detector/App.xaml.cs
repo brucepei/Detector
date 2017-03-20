@@ -14,7 +14,9 @@ namespace Detector
     {
         static App()
         {
-            Logging.Initialize(true, true);
+            Logging.Initialize(false, false);
+            //Logging.Initialize(true, true);
+            //Logging.Initialize(true, false);
             dm = new DeviceManage();
         }
 
