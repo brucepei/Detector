@@ -151,8 +151,13 @@ namespace Detector
             // Receive the response from the remote device.  
             int bytesRec = sender.Receive(bytes);
             result = Encoding.UTF8.GetString(bytes, 0, bytesRec);
-            Logging.logMessage("Remote ADB response:", result.Substring(0, 10));
-  
+            var displayLen = 10;
+            if (result.Length < displayLen)
+            {
+                displayLen = result.Length;
+            }
+            Logging.logMessage("Remote ADB response:", result.Substring(0, displayLen));
+
             // Release the socket.  
             sender.Shutdown(SocketShutdown.Both);  
             sender.Close();  
