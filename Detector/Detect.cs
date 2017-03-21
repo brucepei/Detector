@@ -108,7 +108,12 @@ namespace Detector
             var ifconfig_result = ConnectRemouteADB(asIP, ASPort, sn, "ifconfig lo");
             if (ifconfig_result.IndexOf("oopback") > -1)
             {
-                Logging.logMessage("Got ifconfig loopback: ", ifconfig_result);
+                var displayLen = 10;
+                if (ifconfig_result.Length < displayLen)
+                {
+                    displayLen = ifconfig_result.Length;
+                }
+                Logging.logMessage("Got ifconfig loopback: ", ifconfig_result.Substring(0, displayLen));
                 result = true;
             }
             return result;

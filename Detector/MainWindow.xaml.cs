@@ -43,8 +43,26 @@ namespace Detector
         public RefreshDevicesDoneHandle RepeatRefreshDevicesHandle;
         public void RepeatRefreshDevices()
         {
-            cancelRefreshBtn.IsEnabled = true;
-            dispatcherTimer.Start();
+            if (!cancelRefreshBtn.IsEnabled)
+            {
+                Int32 failed = 0;
+                Int32 passed = 0;
+                foreach (var device in App.DM.DeviceList)
+                {
+                    if (device.Status == DeviceStatus.FAIL)
+                    {
+                        failed++;
+                    }
+                    else if (device.Status == DeviceStatus.PASS)
+                    {
+                        passed++;
+                    }
+                }
+                Logging.logMessage(String.Format("Active devices={0}, inactive devices={1}!", passed, failed), LogType.NOTE);
+                Logging.logMessage("Waiting for next refresh...");
+                cancelRefreshBtn.IsEnabled = true;
+                dispatcherTimer.Start();
+            }
         }
 
         public void OnWaitingRefresh(object sender, EventArgs e)
@@ -85,7 +103,7 @@ namespace Detector
 
         private void StartRefreshButton_Click(object sender, RoutedEventArgs e)
         {
-            App.DM.RefreshDevices();
+            App.DM.RefreshDevices(this);
             startRefreshBtn.IsEnabled = false;
         }
 

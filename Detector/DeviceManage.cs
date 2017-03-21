@@ -7,11 +7,13 @@ using System.Collections.Specialized;
 using System.Windows.Threading;
 using System.Threading.Tasks;
 using System.Collections.Concurrent;
+using System.Windows;
 
 namespace Detector
 {
     
     public delegate void RefreshDevicesDoneHandle();
+
     public class DeviceManage
     {
         public DeviceManage()
@@ -93,13 +95,18 @@ namespace Detector
             t.ContinueWith(task => Logging.logMessage(String.Format("DB saved with exception: {0}!", task.Exception)), TaskContinuationOptions.OnlyOnFaulted);
         }
 
-        public void DoneRefreshDevices(Int32 index)
+        public void DoneRefreshDevices(Int32 deviceId)
         {
-            doneQueue.Enqueue(index);
+            doneQueue.Enqueue(deviceId);
+            Logging.logMessage("Device id " + deviceId + " done!");
             if (doneQueue.Count >= TaskinQueue)
             {
                 Logging.logMessage("Finished refresh all devices!");
                 UI.Dispatcher.BeginInvoke(UI.RepeatRefreshDevicesHandle);
+            }
+            else
+            {
+                StartRefreshTask();
             }
         }
 
@@ -115,7 +122,6 @@ namespace Detector
                     device.Status = DeviceStatus.QUERY;
                     device.Info = "Query...";
                     var t = device.DetectAsync();
-                    t.ContinueWith(task => StartRefreshTask());
                     t.ContinueWith(task => DoneRefreshDevices(device.Id));
                 }
                 else
@@ -125,9 +131,9 @@ namespace Detector
             }
         }
 
-        public void RefreshDevices()
+        public void RefreshDevices(MainWindow ui)
         {
-            UI = App.Current.MainWindow as MainWindow;
+            UI = ui;
             if (resumeQueue != null && !resumeQueue.IsEmpty)
             {
                 Logging.logMessage("Refresh is ongoing, cannot refresh again!");

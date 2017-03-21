@@ -155,8 +155,8 @@
                 }
                 try
                 {
-                    ui.Dispatcher.Invoke(ui.UpdateLogBox, objArray);
-                    //ui.Dispatcher.BeginInvoke(ui.UpdateLogBox, objArray);
+                    //ui.Dispatcher.Invoke(ui.UpdateLogBox, objArray); //will start a new thread and block until Dispatcher handled all other delegates
+                    ui.Dispatcher.BeginInvoke(ui.UpdateLogBox, objArray); //some log lines may be misordered
                 }
                 catch (Exception exception)
                 {
