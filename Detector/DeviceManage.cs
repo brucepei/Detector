@@ -6,6 +6,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Windows.Threading;
 using System.Threading.Tasks;
+using System.Collections.Concurrent;
 
 namespace Detector
 {
@@ -22,7 +23,7 @@ namespace Detector
                 {
                     new Device("CBD Server", DeviceType.IP, "cbd"),
                 };
-                for (int i=1; i < 10; i++)
+                for (int i=1; i < 32; i++)
                 {
                     deviceList.Add(new Device("CBD Server" + i, DeviceType.IP, "128.0.0." + i));
                 }
@@ -34,6 +35,10 @@ namespace Detector
             }
             deviceList.CollectionChanged += OnDeviceListChanged;
         }
+        public readonly Int32 MaxConcurrentTask = 5;
+        private ConcurrentQueue<Int32> resumeQueue;
+        private ConcurrentQueue<Int32> doneQueue;
+        private Int32 TaskinQueue = 0;
 
         public MainWindow UI;
         public Int32 MaxDeviceId()
@@ -85,40 +90,63 @@ namespace Detector
         {
             var t = DB.SaveDataAsync();
             t.ContinueWith(task => Logging.logMessage(String.Format("DB saved: {0}!", task.Result)), TaskContinuationOptions.OnlyOnRanToCompletion);
-            t.ContinueWith(task => Logging.logMessage(String.Format("DB saved exception: {0}!", task.Exception)), TaskContinuationOptions.OnlyOnFaulted);
+            t.ContinueWith(task => Logging.logMessage(String.Format("DB saved with exception: {0}!", task.Exception)), TaskContinuationOptions.OnlyOnFaulted);
         }
 
-        public void DoneRefreshDevices(List<Int32> doneList, Device device, Int32 max)
+        public void DoneRefreshDevices(Int32 index)
         {
-            doneList.Add(device.Id);
-            if (doneList.Count >= max)
+            doneQueue.Enqueue(index);
+            if (doneQueue.Count >= TaskinQueue)
             {
                 Logging.logMessage("Finished refresh all devices!");
                 UI.Dispatcher.BeginInvoke(UI.RepeatRefreshDevicesHandle);
             }
         }
 
+        public void StartRefreshTask()
+        {
+            if (!resumeQueue.IsEmpty) 
+            {
+                Int32 deviceIndex;
+                if (resumeQueue.TryDequeue(out deviceIndex))
+                {
+                    var device = deviceList[deviceIndex];
+                    Logging.logMessage("Got task with device id: " + device.Id);
+                    device.Status = DeviceStatus.QUERY;
+                    device.Info = "Query...";
+                    var t = device.DetectAsync();
+                    t.ContinueWith(task => StartRefreshTask());
+                    t.ContinueWith(task => DoneRefreshDevices(device.Id));
+                }
+                else
+                {
+                    Logging.logMessage("No device to deque!");
+                }
+            }
+        }
+
         public void RefreshDevices()
         {
             UI = App.Current.MainWindow as MainWindow;
-            var doneList = new List<Int32>();
-            var totalDevices = deviceList.Count;
-            for (Int32 i = 0; i < totalDevices; i++)
+            if (resumeQueue != null && !resumeQueue.IsEmpty)
             {
+                Logging.logMessage("Refresh is ongoing, cannot refresh again!");
+                return;
+            }
+            resumeQueue = new ConcurrentQueue<Int32>();
+            doneQueue = new ConcurrentQueue<Int32>();
+            TaskinQueue = deviceList.Count;
+            for (Int32 i = 0; i < deviceList.Count; i++)
+            {
+                resumeQueue.Enqueue(i);
                 var device = deviceList[i];
-                if (device.Type == DeviceType.IP)
-                {
-                    var t = Detect.PingAsync(device.IP, device);
-                    t.ContinueWith(task => DoneRefreshDevices(doneList, device, totalDevices));
-                }
-                else if (device.Type == DeviceType.ADB_IP)
-                {
-                    var t = Detect.PingRemoteADBAsync(device.IP, device.ADB, device);
-                    t.ContinueWith(task => DoneRefreshDevices(doneList, device, totalDevices));
-                }
-                Logging.logMessage(String.Format("Start to ping device {0} of id {1}", device.IP, i));
-                device.Status = DeviceStatus.None;
-                device.Info = "In query";
+                device.Status = DeviceStatus.QUEUE;
+                device.Info = "In Queue";
+            }
+            for (Int32 i = 0; i < MaxConcurrentTask; i++)
+            {
+                Logging.logMessage("Start task: " + i);
+                StartRefreshTask();  
             }
         }
     }

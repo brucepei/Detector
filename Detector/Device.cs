@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.ComponentModel;
+using System.Threading.Tasks;
 
 namespace Detector
 {
     public enum DeviceStatus
     {
-        None,
+        QUEUE,
+        QUERY,
         PASS,
         FAIL,
     }
@@ -127,9 +129,13 @@ namespace Detector
                 {
                     imageName = "ok";
                 }
-                else
+                else if (status == DeviceStatus.QUERY)
                 {
                     imageName = "query";
+                }
+                else
+                {
+                    imageName = "queue";
                 }
                 return String.Format(@"images/{0}_16px.png", imageName);
             }
@@ -167,6 +173,20 @@ namespace Detector
         {
             Status = e == ErrorCode.NoError ? DeviceStatus.PASS : DeviceStatus.FAIL; //use "Status/Info" to trigger property changed event
             Info = msg == null ? String.Empty : msg;
+        }
+
+        public Task<Boolean> DetectAsync()
+        {
+            Task<Boolean> task = null;
+            if (type == DeviceType.IP)
+            {
+                task = Detect.PingAsync(ip, this);
+            }
+            else if (type == DeviceType.ADB_IP)
+            {
+                task = Detect.PingRemoteADBAsync(ip, adb, this);
+            }
+            return task;
         }
     }
 }

@@ -49,6 +49,7 @@ namespace Detector
 
         public static Boolean Ping(String ip, Int32 timeout)
         {
+            Logging.logMessage("Task Ping: " + ip);
             bool online = false;
             Ping ping = new Ping();
             PingReply pingReply = ping.Send(ip, timeout);
@@ -102,6 +103,7 @@ namespace Detector
 
         public static Boolean PingRemouteADB(String asIP, String sn)
         {
+            Logging.logMessage("Task PingRemoteADB: " + asIP);
             var result = false;
             var ifconfig_result = ConnectRemouteADB(asIP, ASPort, sn, "ifconfig lo");
             if (ifconfig_result.IndexOf("oopback") > -1)
@@ -149,7 +151,7 @@ namespace Detector
             // Receive the response from the remote device.  
             int bytesRec = sender.Receive(bytes);
             result = Encoding.UTF8.GetString(bytes, 0, bytesRec);
-            Logging.logMessage("Remote ADB response:", result);  
+            Logging.logMessage("Remote ADB response:", result.Substring(0, 10));
   
             // Release the socket.  
             sender.Shutdown(SocketShutdown.Both);  
