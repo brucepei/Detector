@@ -181,10 +181,12 @@ namespace Detector
             if (type == DeviceType.IP)
             {
                 task = Detect.PingAsync(ip, this);
+                Logging.logMessage(String.Format("Device {0}(id={1}): Ping {2}", id, name, ip));
             }
             else if (type == DeviceType.ADB_IP)
             {
                 task = Detect.PingRemoteADBAsync(ip, adb, this);
+                Logging.logMessage(String.Format("Device {0}(id={1}): Ping remote ADB {2}:{3}", id, name, ip, adb));
             }
             return task;
         }

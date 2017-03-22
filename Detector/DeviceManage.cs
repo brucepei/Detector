@@ -122,7 +122,10 @@ namespace Detector
                     device.Status = DeviceStatus.QUERY;
                     device.Info = "Query...";
                     var t = device.DetectAsync();
-                    t.ContinueWith(task => DoneRefreshDevices(device.Id));
+                    if (t != null)
+                    {
+                        t.ContinueWith(task => DoneRefreshDevices(device.Id));
+                    }
                 }
                 else
                 {

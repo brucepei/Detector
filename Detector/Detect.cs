@@ -103,17 +103,17 @@ namespace Detector
 
         public static Boolean PingRemouteADB(String asIP, String sn)
         {
-            Logging.logMessage("Task PingRemoteADB: " + asIP);
+            Logging.logMessage(String.Format("{0}:{1} Task PingRemoteADB", asIP, sn));
             var result = false;
             var ifconfig_result = ConnectRemouteADB(asIP, ASPort, sn, "ifconfig lo");
             if (ifconfig_result.IndexOf("oopback") > -1)
             {
-                var displayLen = 10;
+                var displayLen = 50;
                 if (ifconfig_result.Length < displayLen)
                 {
                     displayLen = ifconfig_result.Length;
                 }
-                Logging.logMessage("Got ifconfig loopback: ", ifconfig_result.Substring(0, displayLen));
+                Logging.logMessage(String.Format("{0}:{1} Got ifconfig loopback: {2}", asIP, sn, ifconfig_result.Substring(0, displayLen)));
                 result = true;
             }
             return result;
@@ -125,13 +125,20 @@ namespace Detector
             byte[] bytes = new byte[4096];
             // Connect to a remote device
             IPAddress ipAddress = null;
-
-            foreach (var addr in Dns.GetHostEntry(asIP).AddressList)
-            {
-                if (addr.AddressFamily == AddressFamily.InterNetwork)
+            if (!IPAddress.TryParse(asIP, out ipAddress))
+            {//Dns.GetHostEntry may return wrong IP address if some threads have queried a while ago
+                foreach (var addr in Dns.GetHostEntry(asIP).AddressList)
                 {
-                    ipAddress = addr;
-                    break;
+                    Logging.logMessage(String.Format("{0}:{1} addr list:[{2}]", asIP, sn, addr.ToString()));
+                }
+                foreach (var addr in Dns.GetHostEntry(asIP).AddressList)
+                {
+                    if (addr.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        ipAddress = addr;
+                        Logging.logMessage(String.Format("{0}:{1} resolve IPv4={2}", asIP, sn, ipAddress.ToString()));
+                        break;
+                    }
                 }
             }
             if (ipAddress == null)
@@ -144,24 +151,25 @@ namespace Detector
             Socket sender = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp );  
   
             // Connect the socket to the remote endpoint. Catch any errors.  
-            sender.Connect(remoteEP);  
-            Logging.logMessage("Socket connected to {0}", sender.RemoteEndPoint.ToString());  
+            sender.Connect(remoteEP);
+            Logging.logMessage(String.Format("{0}:{1} Socket connected to {2}", asIP, sn, sender.RemoteEndPoint.ToString()));  
   
-            // Encode the data string into a byte array.  
-            byte[] msg = Encoding.ASCII.GetBytes(String.Format("adb -s {0} shell {1}\n", sn, cmd));
+            // Encode the data string into a byte array.
+            String command = String.Format("adb -s {0} shell {1}\n", sn, cmd);
+            byte[] msg = Encoding.ASCII.GetBytes(command);
             // Send the data through the socket.
-            Logging.logMessage("Send msg:", msg.Length);
+            Logging.logMessage(String.Format("Send as command:[{0}]", command));
             int bytesSent = sender.Send(msg);
             sender.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, 10000);
             // Receive the response from the remote device.  
             int bytesRec = sender.Receive(bytes);
             result = Encoding.UTF8.GetString(bytes, 0, bytesRec);
-            var displayLen = 10;
+            var displayLen = 100;
             if (result.Length < displayLen)
             {
                 displayLen = result.Length;
             }
-            Logging.logMessage("Remote ADB response:", result.Substring(0, displayLen));
+            Logging.logMessage(String.Format("{0}:{1} ping Remote ADB response:{2}", asIP, sn, result.Substring(0, displayLen)));
 
             // Release the socket.  
             sender.Shutdown(SocketShutdown.Both);  
