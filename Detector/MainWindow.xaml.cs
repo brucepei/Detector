@@ -106,6 +106,14 @@ namespace Detector
             App.DM.RefreshDevices(this);
             startRefreshBtn.IsEnabled = false;
         }
+        
+        private void DetectFailedButton_Click(object sender, RoutedEventArgs e)
+        {
+            dispatcherTimer.Stop();
+            App.DM.DetectFailedDevices(this);
+            startRefreshBtn.IsEnabled = true;
+            cancelRefreshBtn.IsEnabled = false;
+        }
 
         private void CancelRefreshButton_Click(object sender, RoutedEventArgs e)
         {

@@ -20,6 +20,7 @@ namespace Detector
         ADB,
         ADB_IP,
         IP,
+        AS_IP,
     }
     public class Device : INotifyPropertyChanged
     {
@@ -173,6 +174,17 @@ namespace Detector
         {
             Status = e == ErrorCode.NoError ? DeviceStatus.PASS : DeviceStatus.FAIL; //use "Status/Info" to trigger property changed event
             Info = msg == null ? String.Empty : msg;
+        }
+
+        public Task<JsonCommand> DetectAsync(string cmd, int timeout)
+        {
+            Task<JsonCommand> task = null;
+            if (type == DeviceType.AS_IP)
+            {
+                task = Detect.RunRemoteCmdAsync(ip, cmd, timeout, this);
+                Logging.logMessage(String.Format("Device {0}(id={1}): Run remote command on {2}", id, name, ip));
+            }
+            return task;
         }
 
         public Task<Boolean> DetectAsync()

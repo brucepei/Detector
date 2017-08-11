@@ -19,13 +19,18 @@
                 </MenuItem>
             </Menu>
             <Border DockPanel.Dock="Top" Padding="3">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Refresh remains:" VerticalAlignment="Center" Margin="3, 0, 3, 0" />
-                    <TextBlock Text="" VerticalAlignment="Center" Margin="3, 0, 3, 0" Name="remainTextBlock" />
-                    <Button Content="Start Refresh" Margin="3, 0, 3, 0" Click="StartRefreshButton_Click" Name="startRefreshBtn" />
-                    <Button Content="Cancel Refresh" Margin="3, 0, 3, 0" Click="CancelRefreshButton_Click" Name="cancelRefreshBtn" IsEnabled="False" />
-                    <Button Content="Save Device" Margin="3, 0, 3, 0" Click="SaveDeviceButton_Click" />
-                </StackPanel>
+                <DockPanel LastChildFill="True">
+                    <TextBlock Text="Refresh remains:" VerticalAlignment="Center" Margin="3, 0, 3, 0" DockPanel.Dock="Left"/>
+                    <TextBlock Text="" VerticalAlignment="Center" Margin="3, 0, 3, 0" Name="remainTextBlock" DockPanel.Dock="Left"/>
+                    <Button Content="Start Refresh" Margin="3, 0, 3, 0" Click="StartRefreshButton_Click" Name="startRefreshBtn" DockPanel.Dock="Left"/>
+                    <Button Content="Cancel Refresh" Margin="3, 0, 3, 0" Click="CancelRefreshButton_Click" Name="cancelRefreshBtn" IsEnabled="False" DockPanel.Dock="Left"/>
+                    <Button Content="Detect Failed" Margin="3, 0, 3, 0" Click="DetectFailedButton_Click" Name="detectFailedBtn" DockPanel.Dock="Left" RenderTransformOrigin="0.503,0.5"/>
+                    <Button Content="Save Device" Margin="3, 0, 3, 0" Click="SaveDeviceButton_Click" DockPanel.Dock="Left"/>
+                    <TextBlock Text="AS timeout:" VerticalAlignment="Center" Margin="3, 0, 3, 0" DockPanel.Dock="Left"/>
+                    <TextBox Name="asTimeout" Text="3000" MinWidth="60"/>
+                    <TextBlock Text="AS command:" VerticalAlignment="Center" Margin="3, 0, 3, 0" DockPanel.Dock="Left"/>
+                    <TextBox Name="asCommand" />
+                </DockPanel>
             </Border>
             <DataGrid DockPanel.Dock="Top" Margin="3" Name="grid" AutoGenerateColumns="False" ItemsSource="{Binding}">
                 <DataGrid.Resources>

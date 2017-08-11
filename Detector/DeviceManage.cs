@@ -43,6 +43,9 @@ namespace Detector
         private Int32 TaskinQueue = 0;
 
         public MainWindow UI;
+        public string ASCommand;
+        public int DefaultASTimeout = 5000;
+        public int ASTimeout;
         public Int32 MaxDeviceId()
         {
             Int32 maxId = 0;
@@ -121,10 +124,21 @@ namespace Detector
                     Logging.logMessage("Got task with device id: " + device.Id);
                     device.Status = DeviceStatus.QUERY;
                     device.Info = "Query...";
-                    var t = device.DetectAsync();
-                    if (t != null)
+                    if (device.Type == DeviceType.AS_IP)
                     {
-                        t.ContinueWith(task => DoneRefreshDevices(device.Id));
+                        var t = device.DetectAsync(ASCommand, ASTimeout);
+                        if (t != null)
+                        {
+                            t.ContinueWith(task => DoneRefreshDevices(device.Id));
+                        }
+                    }
+                    else
+                    {
+                        var t = device.DetectAsync();
+                        if (t != null)
+                        {
+                            t.ContinueWith(task => DoneRefreshDevices(device.Id));
+                        }
                     }
                 }
                 else
@@ -134,9 +148,65 @@ namespace Detector
             }
         }
 
+        public void DetectFailedDevices(MainWindow ui)
+        {
+            UI = ui;
+            ASCommand = ui.asCommand.Text;
+            int asTimeout = 0;
+            if (Int32.TryParse(ui.asTimeout.Text, out asTimeout))
+            {
+                ASTimeout = asTimeout;
+            }
+            else
+            {
+                ASTimeout = DefaultASTimeout;
+            }
+            if (resumeQueue != null && !resumeQueue.IsEmpty)
+            {
+                Logging.logMessage("Refresh is ongoing, cannot detect failed device!");
+                return;
+            }
+            resumeQueue = new ConcurrentQueue<Int32>();
+            doneQueue = new ConcurrentQueue<Int32>();
+            TaskinQueue = deviceList.Count;
+            for (Int32 i = 0; i < deviceList.Count; i++)
+            {
+                var device = deviceList[i];
+                if (device.Status == DeviceStatus.FAIL)
+                {
+                    resumeQueue.Enqueue(i);
+                    device.Status = DeviceStatus.QUEUE;
+                    device.Info = "In Queue";
+                }
+            }
+            if (resumeQueue.Count > 0)
+            {
+                Logging.logMessage(String.Format("Found {0} failed device!", resumeQueue.Count));
+                for (Int32 i = 0; i < MaxConcurrentTask; i++)
+                {
+                    Logging.logMessage("Start task: " + i);
+                    StartRefreshTask();
+                }
+            }
+            else
+            {
+                Logging.logMessage("No failed device!");
+            }
+        }
+
         public void RefreshDevices(MainWindow ui)
         {
             UI = ui;
+            ASCommand = ui.asCommand.Text;
+            int asTimeout = 0;
+            if (Int32.TryParse(ui.asTimeout.Text, out asTimeout))
+            {
+                ASTimeout = asTimeout;
+            }
+            else
+            {
+                ASTimeout = DefaultASTimeout;
+            }
             if (resumeQueue != null && !resumeQueue.IsEmpty)
             {
                 Logging.logMessage("Refresh is ongoing, cannot refresh again!");
